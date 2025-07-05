@@ -106,27 +106,16 @@ export const handleSocketConnection = (socket, io) => {
           participants: callData.participants.map(p => ({ id: p.id, name: p.name }))
         });
 
-        // Notify both users (failsafe)
+        // Notify both users (no failsafe, only once per user)
         const waitingSocket = activeUsers.get(waitingUserId);
         const currentSocket = activeUsers.get(userId);
-        if (waitingSocket) {
+        if (waitingSocket && waitingSocket !== currentSocket) {
           console.log('📞 Emitting call_matched to waiting user:', waitingUserId, 'socket:', waitingSocket);
           io.to(waitingSocket).emit('call_matched', callData);
-        } else {
-          console.warn('⚠️ No socket found for waiting user:', waitingUserId);
         }
         if (currentSocket) {
           console.log('📞 Emitting call_matched to current user:', userId, 'socket:', currentSocket);
           io.to(currentSocket).emit('call_matched', callData);
-        } else {
-          console.warn('⚠️ No socket found for current user:', userId);
-        }
-        // Failsafe: emit to the current socket (in case above fails)
-        if (!currentSocket || currentSocket !== socket.id) {
-          io.to(socket.id).emit('call_matched', callData);
-        }
-        if (!waitingSocket || waitingSocket !== socket.id) {
-          io.to(socket.id).emit('call_matched', callData);
         }
       } else {
         waitingUsers.add(userId);
@@ -284,41 +273,25 @@ export const handleSocketConnection = (socket, io) => {
       // Update call status
       const call = await Call.findByIdAndUpdate(callId, {
         status: 'ended',
-        endTime: new Date(),
-        $set: {
-          'participants.$[elem].leftAt': new Date()
-        }
-      }, {
-        arrayFilters: [{ 'elem.user': userId }],
-        new: true
-      });
+        endTime: new Date()
+      }, { new: true });
 
-      if (call) {
-        // Calculate duration
-        const duration = Math.floor((call.endTime - call.startTime) / 1000);
-        await Call.findByIdAndUpdate(callId, { duration });
-
-        // Notify other participants
-        const callData = activeCalls.get(callId);
-        if (callData) {
-          callData.participants.forEach(participant => {
-            if (participant.id !== userId) {
-              const socketId = activeUsers.get(participant.id);
-              if (socketId) {
-                io.to(socketId).emit('call_ended', { callId });
-              }
-            }
-          });
-        }
-
-        // Remove from active calls
-        activeCalls.delete(callId);
-
-        // Generate grammar feedback
-        await generateGrammarFeedback(callId);
+      // Notify all participants
+      const callData = activeCalls.get(callId);
+      if (callData && callData.participants) {
+        callData.participants.forEach(participant => {
+          const socketId = activeUsers.get(participant.id);
+          if (socketId) {
+            io.to(socketId).emit('call_ended', { callId });
+          }
+        });
       }
+      // Clean up activeCalls
+      activeCalls.delete(callId);
+      console.log('📞 Call ended and cleaned up:', callId);
     } catch (error) {
-      console.error('End call error:', error);
+      console.error('end_call error:', error);
+      socket.emit('error', { message: 'Failed to end call' });
     }
   });
 
