@@ -74,6 +74,26 @@ function Dashboard() {
                 Error: {connectionError}
               </div>
             )}
+            <div className="mt-2">
+              <button
+                onClick={() => {
+                  console.log('Testing connection to:', import.meta.env.VITE_SERVER_URL);
+                  fetch(`${import.meta.env.VITE_SERVER_URL}/health`)
+                    .then(response => response.json())
+                    .then(data => {
+                      console.log('Health check response:', data);
+                      alert(`Backend is reachable! Status: ${data.status}`);
+                    })
+                    .catch(error => {
+                      console.error('Health check failed:', error);
+                      alert(`Backend not reachable: ${error.message}`);
+                    });
+                }}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm"
+              >
+                Test Backend Connection
+              </button>
+            </div>
           </div>
         )}
       </div>

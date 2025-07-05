@@ -18,6 +18,7 @@ dotenv.config();
 
 const app = express();
 const server = createServer(app);
+
 // CORS configuration function
 const corsOptions = {
   origin: function (origin, callback) {
@@ -31,6 +32,9 @@ const corsOptions = {
       'https://english-voice-call.vercel.app',
       'https://english-voice-call.vercel.app/'
     ].filter(Boolean);
+    
+    console.log('CORS check - Origin:', origin);
+    console.log('Allowed origins:', allowedOrigins);
     
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -54,11 +58,17 @@ const io = new Server(server, {
         'https://english-voice-call.vercel.app',
         'https://english-voice-call.vercel.app/'
       ].filter(Boolean);
+      
+      console.log('Socket.io CORS check - Origin:', allowedOrigins);
+      console.log('Socket.io allowed origins:', origins);
+      
       return origins.includes(allowedOrigins);
     },
     methods: ['GET', 'POST'],
     credentials: true
-  }
+  },
+  allowEIO3: true,
+  transports: ['websocket', 'polling']
 });
 
 // Middleware
@@ -75,12 +85,40 @@ app.use('/api/auth', authRoutes);
 app.use('/api/friends', ClerkExpressRequireAuth(), friendRoutes);
 app.use('/api/calls', ClerkExpressRequireAuth(), callRoutes);
 
-// Socket.io connection handling
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    clientUrl: process.env.CLIENT_URL,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Socket.io connection handling with authentication
+io.use((socket, next) => {
+  console.log('Socket.io middleware - Socket ID:', socket.id);
+  console.log('Socket.io middleware - Auth:', socket.handshake.auth);
+  
+  // For now, allow all connections (we'll authenticate in the handler)
+  next();
+});
+
 io.on('connection', (socket) => {
+  console.log('🔌 New socket connection:', socket.id);
+  console.log('🔌 Socket auth:', socket.handshake.auth);
+  console.log('🔌 Socket headers:', socket.handshake.headers);
+  
   handleSocketConnection(socket, io);
+  
+  socket.on('disconnect', (reason) => {
+    console.log('🔌 Socket disconnected:', socket.id, 'Reason:', reason);
+  });
 });
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 Client URL: ${process.env.CLIENT_URL}`);
+  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
