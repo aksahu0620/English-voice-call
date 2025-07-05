@@ -45,34 +45,28 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins => {
-      const origins = [
-        process.env.CLIENT_URL,
-        process.env.CLIENT_URL?.replace(/\/$/, ''),
-        process.env.CLIENT_URL?.replace(/\/$/, '') + '/',
-        'https://english-voice-call.vercel.app',
-        'https://english-voice-call.vercel.app/'
-      ].filter(Boolean);
-      
-      console.log('Socket.io CORS check - Origin:', allowedOrigins);
-      console.log('Socket.io allowed origins:', origins);
-      
-      return origins.includes(allowedOrigins);
-    },
+    origin: true, // Allow all origins for Socket.io
     methods: ['GET', 'POST'],
-    credentials: true
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
   },
   allowEIO3: true,
-  transports: ['polling'],
+  transports: ['polling'], // Use polling only for Render compatibility
   pingTimeout: 60000,
   pingInterval: 25000,
   upgradeTimeout: 10000,
-  maxHttpBufferSize: 1e6
+  maxHttpBufferSize: 1e6,
+  allowRequest: (req, callback) => {
+    // Allow all Socket.io requests
+    callback(null, true);
+  }
 });
 
 // Middleware
@@ -109,10 +103,19 @@ app.get('/socket-test', (req, res) => {
   });
 });
 
+// Socket.io endpoint test
+app.get('/socket.io/', (req, res) => {
+  res.json({ 
+    status: 'socket_io_endpoint_working',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Socket.io connection handling with authentication
 io.use((socket, next) => {
   console.log('Socket.io middleware - Socket ID:', socket.id);
   console.log('Socket.io middleware - Auth:', socket.handshake.auth);
+  console.log('Socket.io middleware - Headers:', socket.handshake.headers);
   
   // For now, allow all connections (we'll authenticate in the handler)
   next();
@@ -139,6 +142,20 @@ io.on('connection', (socket) => {
   socket.on('ping', () => {
     socket.emit('pong', { timestamp: new Date().toISOString() });
   });
+  
+  // Error handling
+  socket.on('error', (error) => {
+    console.error('🔌 Socket error:', socket.id, error);
+  });
+});
+
+// Error handling for the server
+server.on('error', (error) => {
+  console.error('🚨 Server error:', error);
+});
+
+io.engine.on('connection_error', (err) => {
+  console.error('🚨 Socket.io connection error:', err);
 });
 
 const PORT = process.env.PORT || 5000;
