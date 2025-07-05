@@ -16,6 +16,8 @@ function CallInterface() {
   const [callStatus, setCallStatus] = useState('connecting'); // connecting, active, ended
   const [participants, setParticipants] = useState([]);
   const [transcripts, setTranscripts] = useState([]);
+  const [connectionState, setConnectionState] = useState('new');
+  const [iceConnectionState, setIceConnectionState] = useState('new');
   const webrtcRef = useRef(null);
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -25,25 +27,49 @@ function CallInterface() {
 
     // Socket event listeners
     const handleCallMatched = (data) => {
-      console.log('Received call_matched event:', data);
+      console.log('📞 Received call_matched event:', data);
       setParticipants(data.participants);
       initializeWebRTC(data);
       setCallStatus('active');
     };
 
     const handleWebRTCOffer = async (data) => {
-      if (!webrtcRef.current) return;
-      await webrtcRef.current.handleOffer(data.offer);
+      console.log('📥 Received WebRTC offer:', data);
+      if (!webrtcRef.current) {
+        console.error('❌ WebRTC not initialized when offer received');
+        return;
+      }
+      try {
+        await webrtcRef.current.handleOffer(data.offer);
+      } catch (error) {
+        console.error('❌ Error handling offer:', error);
+      }
     };
 
     const handleWebRTCAnswer = async (data) => {
-      if (!webrtcRef.current) return;
-      await webrtcRef.current.handleAnswer(data.answer);
+      console.log('📥 Received WebRTC answer:', data);
+      if (!webrtcRef.current) {
+        console.error('❌ WebRTC not initialized when answer received');
+        return;
+      }
+      try {
+        await webrtcRef.current.handleAnswer(data.answer);
+      } catch (error) {
+        console.error('❌ Error handling answer:', error);
+      }
     };
 
     const handleICECandidate = async (data) => {
-      if (!webrtcRef.current) return;
-      await webrtcRef.current.handleIceCandidate(data.candidate);
+      console.log('🧊 Received ICE candidate:', data);
+      if (!webrtcRef.current) {
+        console.error('❌ WebRTC not initialized when ICE candidate received');
+        return;
+      }
+      try {
+        await webrtcRef.current.handleIceCandidate(data.candidate);
+      } catch (error) {
+        console.error('❌ Error handling ICE candidate:', error);
+      }
     };
 
     const handleLiveTranscript = (data) => {
@@ -86,33 +112,79 @@ function CallInterface() {
   }, [socket, isConnected, callId, navigate, initialCallData]);
 
   const initializeWebRTC = async (callData) => {
-    console.log('initializeWebRTC called with:', callData);
-    if (!user) return;
-    // Determine initiator and targetUserId based on Clerk user.id
-    let isInitiator = false;
-    let targetUserId = null;
-    if (callData.participants[0].id === user.id) {
-      isInitiator = true;
-      targetUserId = callData.participants[1].id;
-    } else {
-      isInitiator = false;
-      targetUserId = callData.participants[0].id;
+    console.log('🔧 initializeWebRTC called with:', callData);
+    if (!user) {
+      console.error('❌ No user available for WebRTC initialization');
+      return;
     }
+
+    // Find the current user in participants
+    const currentParticipant = callData.participants.find(p => p.id === user.id);
+    const otherParticipant = callData.participants.find(p => p.id !== user.id);
+
+    if (!currentParticipant || !otherParticipant) {
+      console.error('❌ Could not find participants:', { 
+        currentUser: user.id, 
+        participants: callData.participants.map(p => p.id) 
+      });
+      return;
+    }
+
+    // Determine initiator (first participant is initiator)
+    const isInitiator = callData.participants[0].id === user.id;
+    const targetUserId = otherParticipant.id;
+
+    console.log('🎯 WebRTC setup:', { 
+      isInitiator, 
+      targetUserId, 
+      currentUser: user.id,
+      participants: callData.participants.map(p => ({ id: p.id, name: p.name }))
+    });
+
     const webrtc = new WebRTCConnection(socket, callId, targetUserId);
+    
     // Set up stream handlers
     webrtc.onLocalStream = (stream) => {
+      console.log('🎤 Local stream received:', stream);
       if (localAudioRef.current) {
         localAudioRef.current.srcObject = stream;
+        console.log('✅ Local audio element updated');
+      } else {
+        console.error('❌ Local audio ref not available');
       }
     };
+
     webrtc.onRemoteStream = (stream) => {
+      console.log('🎵 Remote stream received:', stream);
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
+        console.log('✅ Remote audio element updated');
+        // Ensure audio is not muted
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.volume = 1.0;
+      } else {
+        console.error('❌ Remote audio ref not available');
       }
       webrtc.setupAudioProcessing();
     };
-    await webrtc.initialize(isInitiator);
-    webrtcRef.current = webrtc;
+
+    webrtc.onConnectionStateChange = (state) => {
+      console.log('🔗 Connection state changed:', state);
+      setConnectionState(state);
+    };
+
+    webrtc.onIceConnectionStateChange = (state) => {
+      console.log('🧊 ICE connection state changed:', state);
+      setIceConnectionState(state);
+    };
+
+    try {
+      await webrtc.initialize(isInitiator);
+      webrtcRef.current = webrtc;
+      console.log('✅ WebRTC initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize WebRTC:', error);
+    }
   };
 
   const cleanup = () => {
@@ -140,6 +212,32 @@ function CallInterface() {
              callStatus === 'active' ? 'Call in Progress' :
              'Call Ended'}
           </h2>
+          
+          {/* Connection Status */}
+          <div className="mt-4 space-y-2">
+            <div className="text-sm">
+              <span className="font-medium">Connection State:</span>
+              <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                connectionState === 'connected' ? 'bg-green-100 text-green-800' :
+                connectionState === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+                connectionState === 'failed' ? 'bg-red-100 text-red-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {connectionState}
+              </span>
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">ICE State:</span>
+              <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                iceConnectionState === 'connected' ? 'bg-green-100 text-green-800' :
+                iceConnectionState === 'checking' ? 'bg-yellow-100 text-yellow-800' :
+                iceConnectionState === 'failed' ? 'bg-red-100 text-red-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {iceConnectionState}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Participants */}
@@ -171,6 +269,51 @@ function CallInterface() {
         {/* Audio Elements */}
         <audio ref={localAudioRef} autoPlay muted />
         <audio ref={remoteAudioRef} autoPlay />
+        
+        {/* Audio Debug Controls */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <h3 className="text-lg font-medium text-gray-800 mb-3">Audio Debug</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Local Audio</label>
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    if (localAudioRef.current) {
+                      localAudioRef.current.muted = !localAudioRef.current.muted;
+                      console.log('Local audio muted:', localAudioRef.current.muted);
+                    }
+                  }}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                >
+                  Toggle Mute
+                </button>
+                <div className="text-xs text-gray-600">
+                  Muted: {localAudioRef.current?.muted ? 'Yes' : 'No'}
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Remote Audio</label>
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    if (remoteAudioRef.current) {
+                      remoteAudioRef.current.muted = !remoteAudioRef.current.muted;
+                      console.log('Remote audio muted:', remoteAudioRef.current.muted);
+                    }
+                  }}
+                  className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
+                >
+                  Toggle Mute
+                </button>
+                <div className="text-xs text-gray-600">
+                  Muted: {remoteAudioRef.current?.muted ? 'Yes' : 'No'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Live Transcription */}
         <div className="mb-8">
