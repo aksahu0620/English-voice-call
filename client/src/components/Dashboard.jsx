@@ -8,7 +8,7 @@ function Dashboard() {
   console.log('Dashboard rendered');
   const { user } = useUser();
   const navigate = useNavigate();
-  const { socket, isConnected, joinRandomQueue } = useSocket();
+  const { socket, isConnected, connectionError, joinRandomQueue } = useSocket();
   const [isWaiting, setIsWaiting] = useState(false);
   const [onlineFriends, setOnlineFriends] = useState([]);
 
@@ -60,6 +60,24 @@ function Dashboard() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Connection Status */}
+      <div className="mb-4 p-4 rounded-lg">
+        {isConnected ? (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+            ✅ Connected to server
+          </div>
+        ) : (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            ❌ Not connected to server
+            {connectionError && (
+              <div className="text-sm mt-1">
+                Error: {connectionError}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Welcome Section */}
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
