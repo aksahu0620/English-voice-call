@@ -18,6 +18,7 @@ function CallInterface() {
   const [transcripts, setTranscripts] = useState([]);
   const [connectionState, setConnectionState] = useState('new');
   const [iceConnectionState, setIceConnectionState] = useState('new');
+  const [initializedCallId, setInitializedCallId] = useState(null);
   const webrtcRef = useRef(null);
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -28,6 +29,14 @@ function CallInterface() {
     // Socket event listeners
     const handleCallMatched = (data) => {
       console.log('📞 Received call_matched event:', data);
+      
+      // Prevent duplicate initialization for the same call
+      if (initializedCallId === data.callId) {
+        console.log('⚠️ Already initialized for this call, ignoring duplicate event');
+        return;
+      }
+      
+      setInitializedCallId(data.callId);
       setParticipants(data.participants);
       initializeWebRTC(data);
       setCallStatus('active');
@@ -82,6 +91,7 @@ function CallInterface() {
 
     const handleCallEnded = () => {
       setCallStatus('ended');
+      setInitializedCallId(null);
       cleanup();
       navigate('/history');
     };
@@ -107,6 +117,7 @@ function CallInterface() {
       socket.off('webrtc_ice_candidate', handleICECandidate);
       socket.off('live_transcript', handleLiveTranscript);
       socket.off('call_ended', handleCallEnded);
+      setInitializedCallId(null);
       cleanup();
     };
   }, [socket, isConnected, callId, navigate, initialCallData]);
