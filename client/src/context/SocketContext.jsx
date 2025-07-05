@@ -30,9 +30,13 @@ export function SocketProvider({ children }) {
       auth: {
         token: user.id
       },
-      transports: ['websocket', 'polling'],
-      timeout: 20000,
-      forceNew: true
+      transports: ['polling'],
+      timeout: 10000,
+      forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000
     });
 
     // Socket event handlers
@@ -43,6 +47,17 @@ export function SocketProvider({ children }) {
       
       // Register user
       socketInstance.emit('user_online', { userId: user.id });
+      
+      // Start keep-alive ping
+      const pingInterval = setInterval(() => {
+        if (socketInstance.connected) {
+          socketInstance.emit('ping');
+        }
+      }, 30000); // Ping every 30 seconds
+      
+      socketInstance.on('disconnect', () => {
+        clearInterval(pingInterval);
+      });
     });
 
     socketInstance.on('connect_error', (error) => {
@@ -70,6 +85,14 @@ export function SocketProvider({ children }) {
     socketInstance.on('reconnect_error', (error) => {
       console.error('❌ Socket reconnection error:', error);
       setConnectionError(error.message);
+    });
+
+    socketInstance.on('connection_confirmed', (data) => {
+      console.log('✅ Connection confirmed by server:', data);
+    });
+
+    socketInstance.on('pong', (data) => {
+      console.log('🏓 Pong received:', data);
     });
 
     setSocket(socketInstance);

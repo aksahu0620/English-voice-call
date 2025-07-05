@@ -74,7 +74,7 @@ function Dashboard() {
                 Error: {connectionError}
               </div>
             )}
-            <div className="mt-2">
+            <div className="mt-2 space-y-2">
               <button
                 onClick={() => {
                   console.log('Testing connection to:', import.meta.env.VITE_SERVER_URL);
@@ -89,9 +89,26 @@ function Dashboard() {
                       alert(`Backend not reachable: ${error.message}`);
                     });
                 }}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm"
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm mr-2"
               >
                 Test Backend Connection
+              </button>
+              <button
+                onClick={() => {
+                  fetch(`${import.meta.env.VITE_SERVER_URL}/socket-test`)
+                    .then(response => response.json())
+                    .then(data => {
+                      console.log('Socket test response:', data);
+                      alert(`Socket.io ready! Active connections: ${data.activeConnections}`);
+                    })
+                    .catch(error => {
+                      console.error('Socket test failed:', error);
+                      alert(`Socket.io not ready: ${error.message}`);
+                    });
+                }}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm"
+              >
+                Test Socket.io
               </button>
             </div>
           </div>

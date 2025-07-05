@@ -68,7 +68,11 @@ const io = new Server(server, {
     credentials: true
   },
   allowEIO3: true,
-  transports: ['websocket', 'polling']
+  transports: ['polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 10000,
+  maxHttpBufferSize: 1e6
 });
 
 // Middleware
@@ -95,6 +99,16 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Socket.io test endpoint
+app.get('/socket-test', (req, res) => {
+  res.json({ 
+    status: 'socket_ready',
+    timestamp: new Date().toISOString(),
+    activeConnections: io.engine.clientsCount,
+    transports: ['polling']
+  });
+});
+
 // Socket.io connection handling with authentication
 io.use((socket, next) => {
   console.log('Socket.io middleware - Socket ID:', socket.id);
@@ -109,10 +123,21 @@ io.on('connection', (socket) => {
   console.log('🔌 Socket auth:', socket.handshake.auth);
   console.log('🔌 Socket headers:', socket.handshake.headers);
   
+  // Send immediate confirmation
+  socket.emit('connection_confirmed', { 
+    socketId: socket.id, 
+    timestamp: new Date().toISOString() 
+  });
+  
   handleSocketConnection(socket, io);
   
   socket.on('disconnect', (reason) => {
     console.log('🔌 Socket disconnected:', socket.id, 'Reason:', reason);
+  });
+  
+  // Keep-alive ping
+  socket.on('ping', () => {
+    socket.emit('pong', { timestamp: new Date().toISOString() });
   });
 });
 
