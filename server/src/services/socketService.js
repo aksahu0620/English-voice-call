@@ -64,6 +64,11 @@ export const handleSocketConnection = (socket, io) => {
           User.findOne({ clerkId: waitingUserId })
         ]);
 
+        console.log('👥 Users found:', {
+          user1: { clerkId: user1?.clerkId, name: user1?.firstName, mongoId: user1?._id },
+          user2: { clerkId: user2?.clerkId, name: user2?.firstName, mongoId: user2?._id }
+        });
+
         // Create new call with MongoDB ObjectIds
         const newCall = new Call({
           participants: [
@@ -82,12 +87,12 @@ export const handleSocketConnection = (socket, io) => {
           callId: newCall._id,
           participants: [
             {
-              id: user1._id.toString(),
+              id: user1.clerkId, // Use Clerk ID instead of MongoDB ID
               name: user1.firstName || user1.username || user1.email || 'Unknown',
               avatar: user1.avatar
             },
             {
-              id: user2._id.toString(),
+              id: user2.clerkId, // Use Clerk ID instead of MongoDB ID
               name: user2.firstName || user2.username || user2.email || 'Unknown',
               avatar: user2.avatar
             }
@@ -96,13 +101,18 @@ export const handleSocketConnection = (socket, io) => {
 
         activeCalls.set(newCall._id.toString(), callData);
 
+        console.log('📞 Call data created:', {
+          callId: newCall._id,
+          participants: callData.participants.map(p => ({ id: p.id, name: p.name }))
+        });
+
         // Notify both users
         const waitingSocket = activeUsers.get(waitingUserId);
         if (waitingSocket) {
-          console.log('Emitting call_matched to', user2._id, 'with data:', callData);
+          console.log('📞 Emitting call_matched to waiting user:', waitingUserId);
           io.to(waitingSocket).emit('call_matched', callData);
         }
-        console.log('Emitting call_matched to', user1._id, 'with data:', callData);
+        console.log('📞 Emitting call_matched to current user:', userId);
         socket.emit('call_matched', callData);
       } else {
         waitingUsers.add(userId);
@@ -165,6 +175,7 @@ export const handleSocketConnection = (socket, io) => {
   // WebRTC signaling
   socket.on('webrtc_offer', (data) => {
     const { callId, offer, targetUserId } = data;
+    console.log('📤 WebRTC offer received:', { callId, targetUserId, fromUserId: socket.userId });
     const targetSocketId = activeUsers.get(targetUserId);
     if (targetSocketId) {
       io.to(targetSocketId).emit('webrtc_offer', {
@@ -172,11 +183,15 @@ export const handleSocketConnection = (socket, io) => {
         offer,
         fromUserId: socket.userId
       });
+      console.log('📤 WebRTC offer forwarded to:', targetUserId);
+    } else {
+      console.error('❌ Target user not found for WebRTC offer:', targetUserId);
     }
   });
 
   socket.on('webrtc_answer', (data) => {
     const { callId, answer, targetUserId } = data;
+    console.log('📤 WebRTC answer received:', { callId, targetUserId, fromUserId: socket.userId });
     const targetSocketId = activeUsers.get(targetUserId);
     if (targetSocketId) {
       io.to(targetSocketId).emit('webrtc_answer', {
@@ -184,11 +199,15 @@ export const handleSocketConnection = (socket, io) => {
         answer,
         fromUserId: socket.userId
       });
+      console.log('📤 WebRTC answer forwarded to:', targetUserId);
+    } else {
+      console.error('❌ Target user not found for WebRTC answer:', targetUserId);
     }
   });
 
   socket.on('webrtc_ice_candidate', (data) => {
     const { callId, candidate, targetUserId } = data;
+    console.log('🧊 ICE candidate received:', { callId, targetUserId, fromUserId: socket.userId });
     const targetSocketId = activeUsers.get(targetUserId);
     if (targetSocketId) {
       io.to(targetSocketId).emit('webrtc_ice_candidate', {
@@ -196,6 +215,9 @@ export const handleSocketConnection = (socket, io) => {
         candidate,
         fromUserId: socket.userId
       });
+      console.log('🧊 ICE candidate forwarded to:', targetUserId);
+    } else {
+      console.error('❌ Target user not found for ICE candidate:', targetUserId);
     }
   });
 
