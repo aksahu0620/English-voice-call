@@ -44,6 +44,7 @@ export const handleSocketConnection = (socket, io) => {
       const userId = socket.userId;
       console.log('join_random_queue event for userId:', userId);
       console.log('Current waitingUsers before:', Array.from(waitingUsers));
+      console.log('activeUsers:', Array.from(activeUsers.entries()));
       if (!userId) {
         console.error('join_random_queue: socket.userId is undefined!');
         return;
@@ -82,17 +83,16 @@ export const handleSocketConnection = (socket, io) => {
 
         await newCall.save();
 
-        // Get user details
         const callData = {
           callId: newCall._id,
           participants: [
             {
-              id: user1.clerkId, // Use Clerk ID instead of MongoDB ID
+              id: user1.clerkId,
               name: user1.firstName || user1.username || user1.email || 'Unknown',
               avatar: user1.avatar
             },
             {
-              id: user2.clerkId, // Use Clerk ID instead of MongoDB ID
+              id: user2.clerkId,
               name: user2.firstName || user2.username || user2.email || 'Unknown',
               avatar: user2.avatar
             }
@@ -106,14 +106,28 @@ export const handleSocketConnection = (socket, io) => {
           participants: callData.participants.map(p => ({ id: p.id, name: p.name }))
         });
 
-        // Notify both users
+        // Notify both users (failsafe)
         const waitingSocket = activeUsers.get(waitingUserId);
+        const currentSocket = activeUsers.get(userId);
         if (waitingSocket) {
-          console.log('📞 Emitting call_matched to waiting user:', waitingUserId);
+          console.log('📞 Emitting call_matched to waiting user:', waitingUserId, 'socket:', waitingSocket);
           io.to(waitingSocket).emit('call_matched', callData);
+        } else {
+          console.warn('⚠️ No socket found for waiting user:', waitingUserId);
         }
-        console.log('📞 Emitting call_matched to current user:', userId);
-        socket.emit('call_matched', callData);
+        if (currentSocket) {
+          console.log('📞 Emitting call_matched to current user:', userId, 'socket:', currentSocket);
+          io.to(currentSocket).emit('call_matched', callData);
+        } else {
+          console.warn('⚠️ No socket found for current user:', userId);
+        }
+        // Failsafe: emit to the current socket (in case above fails)
+        if (!currentSocket || currentSocket !== socket.id) {
+          io.to(socket.id).emit('call_matched', callData);
+        }
+        if (!waitingSocket || waitingSocket !== socket.id) {
+          io.to(socket.id).emit('call_matched', callData);
+        }
       } else {
         waitingUsers.add(userId);
         console.log('Added user to waitingUsers:', userId);
