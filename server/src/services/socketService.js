@@ -63,7 +63,12 @@ export const handleSocketConnection = (socket, io) => {
       if (waitingUsers.size > 0) {
         const waitingUserId = waitingUsers.values().next().value;
         waitingUsers.delete(waitingUserId);
+        waitingUsers.delete(userId);
         console.log('Matching', userId, 'with', waitingUserId);
+        console.log('Socket IDs:', {
+          userIdSocket: activeUsers.get(userId),
+          waitingUserIdSocket: activeUsers.get(waitingUserId)
+        });
 
         // Get user details by clerkId
         const [user1, user2] = await Promise.all([
@@ -115,13 +120,18 @@ export const handleSocketConnection = (socket, io) => {
         // Notify both users (no failsafe, only once per user)
         const waitingSocket = activeUsers.get(waitingUserId);
         const currentSocket = activeUsers.get(userId);
-        if (waitingSocket && waitingSocket !== currentSocket) {
-          console.log('📞 Emitting call_matched to waiting user:', waitingUserId, 'socket:', waitingSocket);
-          io.to(waitingSocket).emit('call_matched', callData);
-        }
-        if (currentSocket) {
-          console.log('📞 Emitting call_matched to current user:', userId, 'socket:', currentSocket);
+        if (waitingSocket && currentSocket && waitingSocket === currentSocket) {
+          // If both are the same socket (shouldn't happen), only emit once
           io.to(currentSocket).emit('call_matched', callData);
+        } else {
+          if (waitingSocket) {
+            console.log('📞 Emitting call_matched to waiting user:', waitingUserId, 'socket:', waitingSocket);
+            io.to(waitingSocket).emit('call_matched', callData);
+          }
+          if (currentSocket) {
+            console.log('📞 Emitting call_matched to current user:', userId, 'socket:', currentSocket);
+            io.to(currentSocket).emit('call_matched', callData);
+          }
         }
       } else {
         waitingUsers.add(userId);
