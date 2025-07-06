@@ -28,10 +28,16 @@ function Dashboard() {
       setOnlineFriends(data.onlineFriends);
     };
 
+    const handleSocketError = (error) => {
+      setIsWaiting(false);
+      alert(error?.message || 'An error occurred while starting a random call.');
+    };
+
     // Register event listeners
     socket.on('waiting_for_match', handleWaitingForMatch);
     socket.on('call_matched', handleCallMatched);
     socket.on('friends_status_update', handleFriendsStatusUpdate);
+    socket.on('error', handleSocketError);
 
     // Request online friends list
     socket.emit('get_online_friends');
@@ -40,6 +46,7 @@ function Dashboard() {
       socket.off('waiting_for_match', handleWaitingForMatch);
       socket.off('call_matched', handleCallMatched);
       socket.off('friends_status_update', handleFriendsStatusUpdate);
+      socket.off('error', handleSocketError);
     };
   }, [socket, isConnected, navigate]);
 
@@ -47,6 +54,7 @@ function Dashboard() {
     console.log('Random Call button clicked');
     if (!isConnected) {
       console.log('Socket not connected');
+      alert('Not connected to server. Please check your connection and try again.');
       return;
     }
     console.log('Calling joinRandomQueue');
@@ -137,11 +145,13 @@ function Dashboard() {
           </p>
           <button
             onClick={handleRandomCall}
-            disabled={isWaiting}
+            disabled={isWaiting || !isConnected}
             className={`w-full py-3 px-6 rounded-lg text-white font-medium
               ${isWaiting
                 ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-primary-600 hover:bg-primary-700'}`}
+                : !isConnected
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-primary-600 hover:bg-primary-700'}`}
           >
             {isWaiting ? 'Finding a partner...' : 'Start Random Call'}
           </button>
