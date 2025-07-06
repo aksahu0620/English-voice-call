@@ -230,6 +230,7 @@ function CallInterface() {
   };
 
   const handleEndCall = () => {
+    if (callStatus === 'ended') return; // Prevent double execution
     if (socket && isConnected) {
       socket.emit('end_call', { callId });
       cleanup();
@@ -372,12 +373,14 @@ function CallInterface() {
 
         {/* Call Controls */}
         <div className="flex justify-center">
-          <button
-            onClick={handleEndCall}
-            className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg"
-          >
-            End Call
-          </button>
+          {callStatus !== 'ended' && (
+            <button
+              onClick={handleEndCall}
+              className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg"
+            >
+              End Call
+            </button>
+          )}
         </div>
       </div>
     </div>
