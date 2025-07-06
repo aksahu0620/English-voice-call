@@ -41,7 +41,7 @@ export function SocketProvider({ children }) {
 
     // Socket event handlers
     socketInstance.on('connect', () => {
-      console.log('✅ Socket connected successfully', socketInstance.id);
+      console.log('Socket connected successfully', socketInstance.id);
       setIsConnected(true);
       setConnectionError(null);
       
@@ -61,45 +61,45 @@ export function SocketProvider({ children }) {
     });
 
     socketInstance.on('connect_error', (error) => {
-      console.error('❌ Socket connection error:', error);
+      console.error('Socket connection error:', error);
       setConnectionError(error.message);
       setIsConnected(false);
     });
 
     socketInstance.on('disconnect', (reason) => {
-      console.log('🔌 Socket disconnected:', reason);
+      console.log('Socket disconnected:', reason);
       setIsConnected(false);
     });
 
     socketInstance.on('error', (error) => {
-      console.error('❌ Socket error:', error);
+      console.error('Socket error:', error);
       setConnectionError(error.message);
     });
 
     socketInstance.on('reconnect', (attemptNumber) => {
-      console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
+      console.log('Socket reconnected after', attemptNumber, 'attempts');
       setIsConnected(true);
       setConnectionError(null);
     });
 
     socketInstance.on('reconnect_error', (error) => {
-      console.error('❌ Socket reconnection error:', error);
+      console.error('Socket reconnection error:', error);
       setConnectionError(error.message);
     });
 
     socketInstance.on('connection_confirmed', (data) => {
-      console.log('✅ Connection confirmed by server:', data);
+      console.log('Connection confirmed by server:', data);
     });
 
     socketInstance.on('pong', (data) => {
-      console.log('🏓 Pong received:', data);
+      console.log('Pong received:', data);
     });
 
     setSocket(socketInstance);
 
     // Cleanup on unmount
     return () => {
-      console.log('🧹 Cleaning up socket connection');
+      console.log('Cleaning up socket connection');
       if (socketInstance) {
         socketInstance.disconnect();
       }
@@ -114,10 +114,10 @@ export function SocketProvider({ children }) {
     // Helper functions for common socket operations
     joinRandomQueue: () => {
       if (socket && isConnected) {
-        console.log('🎯 Emitting join_random_queue');
+        console.log('Emitting join_random_queue');
         socket.emit('join_random_queue');
       } else {
-        console.log('❌ Socket not ready', { 
+        console.log('Socket not ready', { 
           socket: !!socket, 
           isConnected, 
           connectionError 

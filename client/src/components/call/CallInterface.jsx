@@ -22,17 +22,18 @@ function CallInterface() {
   const webrtcRef = useRef(null);
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
+  const pendingSignalsRef = useRef([]);
 
   useEffect(() => {
     if (!isConnected || !socket) return;
 
     // Socket event listeners
     const handleCallMatched = (data) => {
-      console.log('📞 Received call_matched event:', data);
+      console.log('Received call_matched event:', data);
       
       // Prevent duplicate initialization for the same call
       if (initializedCallId === data.callId) {
-        console.log('⚠️ Already initialized for this call, ignoring duplicate event');
+        console.log('Already initialized for this call, ignoring duplicate event');
         return;
       }
       
@@ -43,41 +44,45 @@ function CallInterface() {
     };
 
     const handleWebRTCOffer = async (data) => {
-      console.log('📥 Received WebRTC offer:', data);
+      console.log('Received WebRTC offer:', data);
       if (!webrtcRef.current) {
-        console.error('❌ WebRTC not initialized when offer received');
+        // Queue the offer if WebRTC is not initialized
+        pendingSignalsRef.current.push({ type: 'offer', data });
+        console.warn('Queued offer until WebRTC is initialized');
         return;
       }
       try {
         await webrtcRef.current.handleOffer(data.offer);
       } catch (error) {
-        console.error('❌ Error handling offer:', error);
+        console.error('Error handling offer:', error);
       }
     };
 
     const handleWebRTCAnswer = async (data) => {
-      console.log('📥 Received WebRTC answer:', data);
+      console.log('Received WebRTC answer:', data);
       if (!webrtcRef.current) {
-        console.error('❌ WebRTC not initialized when answer received');
+        console.error('WebRTC not initialized when answer received');
         return;
       }
       try {
         await webrtcRef.current.handleAnswer(data.answer);
       } catch (error) {
-        console.error('❌ Error handling answer:', error);
+        console.error('Error handling answer:', error);
       }
     };
 
     const handleICECandidate = async (data) => {
-      console.log('🧊 Received ICE candidate:', data);
+      console.log('Received ICE candidate:', data);
       if (!webrtcRef.current) {
-        console.error('❌ WebRTC not initialized when ICE candidate received');
+        // Queue the ICE candidate if WebRTC is not initialized
+        pendingSignalsRef.current.push({ type: 'ice', data });
+        console.warn('Queued ICE candidate until WebRTC is initialized');
         return;
       }
       try {
         await webrtcRef.current.handleIceCandidate(data.candidate);
       } catch (error) {
-        console.error('❌ Error handling ICE candidate:', error);
+        console.error('Error handling ICE candidate:', error);
       }
     };
 
@@ -123,9 +128,9 @@ function CallInterface() {
   }, [socket, isConnected, callId, navigate, initialCallData]);
 
   const initializeWebRTC = async (callData) => {
-    console.log('🔧 initializeWebRTC called with:', callData);
+    console.log('Initializing WebRTC called with:', callData);
     if (!user) {
-      console.error('❌ No user available for WebRTC initialization');
+      console.error('No user available for WebRTC initialization');
       return;
     }
 
@@ -134,7 +139,7 @@ function CallInterface() {
     const otherParticipant = callData.participants.find(p => p.id !== user.id);
 
     if (!currentParticipant || !otherParticipant) {
-      console.error('❌ Could not find participants:', { 
+      console.error('Could not find participants:', { 
         currentUser: user.id, 
         participants: callData.participants.map(p => p.id) 
       });
@@ -145,7 +150,7 @@ function CallInterface() {
     const isInitiator = callData.participants[0].id === user.id;
     const targetUserId = otherParticipant.id;
 
-    console.log('🎯 WebRTC setup:', { 
+    console.log('WebRTC setup:', { 
       isInitiator, 
       targetUserId, 
       currentUser: user.id,
@@ -156,45 +161,64 @@ function CallInterface() {
     
     // Set up stream handlers
     webrtc.onLocalStream = (stream) => {
-      console.log('🎤 Local stream received:', stream);
+      console.log('Local stream received:', stream);
       if (localAudioRef.current) {
         localAudioRef.current.srcObject = stream;
-        console.log('✅ Local audio element updated');
+        console.log('Local audio element updated');
       } else {
-        console.error('❌ Local audio ref not available');
+        console.error('Local audio ref not available');
       }
     };
 
     webrtc.onRemoteStream = (stream) => {
-      console.log('🎵 Remote stream received:', stream);
+      console.log('Remote stream received:', stream);
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
-        console.log('✅ Remote audio element updated');
+        console.log('Remote audio element updated');
         // Ensure audio is not muted
         remoteAudioRef.current.muted = false;
         remoteAudioRef.current.volume = 1.0;
       } else {
-        console.error('❌ Remote audio ref not available');
+        console.error('Remote audio ref not available');
       }
       webrtc.setupAudioProcessing();
     };
 
     webrtc.onConnectionStateChange = (state) => {
-      console.log('🔗 Connection state changed:', state);
+      console.log('Connection state changed:', state);
       setConnectionState(state);
     };
 
     webrtc.onIceConnectionStateChange = (state) => {
-      console.log('🧊 ICE connection state changed:', state);
+      console.log('ICE connection state changed:', state);
       setIceConnectionState(state);
     };
 
     try {
       await webrtc.initialize(isInitiator);
       webrtcRef.current = webrtc;
-      console.log('✅ WebRTC initialized successfully');
+      console.log('WebRTC initialized successfully');
+      // Process any queued signals
+      if (pendingSignalsRef.current.length > 0) {
+        for (const signal of pendingSignalsRef.current) {
+          if (signal.type === 'offer') {
+            try {
+              await webrtcRef.current.handleOffer(signal.data.offer);
+            } catch (error) {
+              console.error('Error handling queued offer:', error);
+            }
+          } else if (signal.type === 'ice') {
+            try {
+              await webrtcRef.current.handleIceCandidate(signal.data.candidate);
+            } catch (error) {
+              console.error('Error handling queued ICE candidate:', error);
+            }
+          }
+        }
+        pendingSignalsRef.current = [];
+      }
     } catch (error) {
-      console.error('❌ Failed to initialize WebRTC:', error);
+      console.error('Failed to initialize WebRTC:', error);
     }
   };
 
