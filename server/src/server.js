@@ -62,7 +62,7 @@ const io = new Server(server, {
   pingTimeout: 60000,
   pingInterval: 25000,
   upgradeTimeout: 10000,
-  maxHttpBufferSize: 1e6,
+  maxHttpBufferSize: 10 * 1024 * 1024, // 10 MB
   allowRequest: (req, callback) => {
     // Allow all Socket.io requests
     callback(null, true);
@@ -71,7 +71,8 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)

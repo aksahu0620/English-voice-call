@@ -33,7 +33,8 @@ const io = new Server(httpServer, {
     origin: ['http://localhost:5173', 'http://192.168.83.66:5174', 'http://192.168.83.66:5173'],
     methods: ['GET', 'POST'],
     credentials: true
-  }
+  },
+  maxHttpBufferSize: 10 * 1024 * 1024 // 10 MB
 });
 
 // Middleware
@@ -41,7 +42,8 @@ app.use(cors({
   origin: ['http://localhost:5173', 'http://192.168.83.66:5174', 'http://192.168.83.66:5173'],
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
