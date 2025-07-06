@@ -19,23 +19,22 @@ dotenv.config();
 const app = express();
 const server = createServer(app);
 
-// CORS configuration function
+// Add your deployed Vercel frontend URL here
+const allowedOrigins = [
+  'https://english-voice-call.vercel.app',
+  'https://english-voice-call.vercel.app/',
+  'http://localhost:5173',
+  'https://localhost:5173',
+  'http://192.168.83.66:5174',
+  'http://192.168.83.66:5173'
+];
+
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      process.env.CLIENT_URL,
-      process.env.CLIENT_URL?.replace(/\/$/, ''), // Remove trailing slash
-      process.env.CLIENT_URL?.replace(/\/$/, '') + '/', // Add trailing slash
-      'https://english-voice-call.vercel.app',
-      'https://english-voice-call.vercel.app/'
-    ].filter(Boolean);
-    
     console.log('CORS check - Origin:', origin);
     console.log('Allowed origins:', allowedOrigins);
-    
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -52,7 +51,7 @@ const corsOptions = {
 
 const io = new Server(server, {
   cors: {
-    origin: true, // Allow all origins for Socket.io
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']

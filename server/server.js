@@ -27,10 +27,19 @@ const app = express();
 // Create HTTP server
 const httpServer = createServer(app);
 
+// Add your deployed Vercel frontend URL here
+const allowedOrigins = [
+  'https://english-voice-call.vercel.app',
+  'https://english-voice-call.vercel.app/',
+  'http://localhost:5173',
+  'http://192.168.83.66:5174',
+  'http://192.168.83.66:5173'
+];
+
 // Create Socket.IO server
 const io = new Server(httpServer, {
   cors: {
-    origin: ['http://localhost:5173', 'http://192.168.83.66:5174', 'http://192.168.83.66:5173'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   },
@@ -39,7 +48,7 @@ const io = new Server(httpServer, {
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://192.168.83.66:5174', 'http://192.168.83.66:5173'],
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
