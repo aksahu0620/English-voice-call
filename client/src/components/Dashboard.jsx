@@ -11,6 +11,7 @@ function Dashboard() {
   const { socket, isConnected, connectionError, joinRandomQueue } = useSocket();
   const [isWaiting, setIsWaiting] = useState(false);
   const [onlineFriends, setOnlineFriends] = useState([]);
+  const [onlineUserCount, setOnlineUserCount] = useState(0);
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -33,11 +34,16 @@ function Dashboard() {
       alert(error?.message || 'An error occurred while starting a random call.');
     };
 
+    const handleOnlineUserCount = (data) => {
+      setOnlineUserCount(data.count);
+    };
+
     // Register event listeners
     socket.on('waiting_for_match', handleWaitingForMatch);
     socket.on('call_matched', handleCallMatched);
     socket.on('friends_status_update', handleFriendsStatusUpdate);
     socket.on('error', handleSocketError);
+    socket.on('online_user_count', handleOnlineUserCount);
 
     // Request online friends list
     socket.emit('get_online_friends');
@@ -47,6 +53,7 @@ function Dashboard() {
       socket.off('call_matched', handleCallMatched);
       socket.off('friends_status_update', handleFriendsStatusUpdate);
       socket.off('error', handleSocketError);
+      socket.off('online_user_count', handleOnlineUserCount);
     };
   }, [socket, isConnected, navigate]);
 
@@ -68,6 +75,11 @@ function Dashboard() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Online Users */}
+      <div className="mb-4 text-right text-sm text-gray-600">
+        Online users: <span className="font-semibold">{onlineUserCount}</span>
+      </div>
+
       {/* Connection Status */}
       <div className="mb-4 p-4 rounded-lg">
         {isConnected ? (

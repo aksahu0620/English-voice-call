@@ -6,6 +6,10 @@ const activeUsers = new Map(); // userId -> socketId
 const waitingUsers = new Set(); // users waiting for random calls
 const activeCalls = new Map(); // callId -> call data
 
+function getOnlineUserCount() {
+  return activeUsers.size;
+}
+
 export const handleSocketConnection = (socket, io) => {
   console.log('User connected:', socket.id);
 
@@ -32,6 +36,8 @@ export const handleSocketConnection = (socket, io) => {
       }
 
       socket.emit('user_registered', { success: true });
+      // Broadcast online user count to all clients
+      io.emit('online_user_count', { count: getOnlineUserCount() });
     } catch (error) {
       console.error('user_online error:', error);
       socket.emit('error', { message: 'Failed to register user' });
@@ -310,6 +316,8 @@ export const handleSocketConnection = (socket, io) => {
           { isOnline: false, lastSeen: new Date() }
         );
       }
+      // Broadcast online user count to all clients
+      io.emit('online_user_count', { count: getOnlineUserCount() });
     } catch (error) {
       console.error('Disconnect error:', error);
     }
@@ -334,3 +342,5 @@ async function generateGrammarFeedback(callId) {
     console.error('Grammar feedback error:', error);
   }
 }
+
+export { getOnlineUserCount };
